@@ -2,7 +2,7 @@ import cv2
 from PIL import Image
 from pathlib import Path
 
-import os.path as os
+import os
 
 import traceback
 
