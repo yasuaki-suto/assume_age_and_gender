@@ -85,8 +85,9 @@ def age_gender_predict(faces):
         if os.isdir("model") == False:
             pre_model = "https://github.com/yu4u/age-gender-estimation/releases/download/v0.5/weights.28-3.73.hdf5"
             modhash = 'fbe63257a054c1c5466cfd7bf14646d6'
-            weight_file = get_file("weights.28-3.73.hdf5", pre_model, cache_subdir="model",
-                                   file_hash=modhash, cache_dir=str(Path(__file__).resolve().parent))
+            #weight_file = get_file("weights.28-3.73.hdf5", pre_model, cache_subdir="model",
+            #                       file_hash=modhash, cache_dir=str(Path(__file__).resolve().parent))
+            weight_file = get_file("weights.28-3.73.hdf5", pre_model, file_hash=modhash)
         else:
             weight_file = "model/weights.28-3.73.hdf5"            
 
