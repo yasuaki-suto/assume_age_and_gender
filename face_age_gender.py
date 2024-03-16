@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 #
 #       顔検出 + 性別・年齢予測
 #
@@ -33,89 +35,106 @@ from scipy import misc
 from tensorflow.python.keras.utils.data_utils import get_file
 import os.path as os
 from PIL import Image
+from omegaconf import OmegaConf
+from tensorflow.keras import applications
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense
+import dlib
+
+def get_model(cfg):
+    base_model = getattr(applications, cfg.model.model_name)(
+        include_top=False,
+        input_shape=(cfg.model.img_size, cfg.model.img_size, 3),
+        pooling="avg"
+    )
+    features = base_model.output
+    pred_gender = Dense(units=2, activation="softmax", name="pred_gender")(features)
+    pred_age = Dense(units=101, activation="softmax", name="pred_age")(features)
+    model = Model(inputs=base_model.input, outputs=[pred_gender, pred_age])
+    return model
+
 
 # 性別・年齢を表記する関数
-def draw_label(image, point, label, font=cv2.FONT_HERSHEY_SIMPLEX,
-               font_scale=0.3, thickness=1):
+def draw_label(image, point, label, color, font=cv2.FONT_HERSHEY_SIMPLEX,
+               font_scale=0.5, thickness=1):
     size = cv2.getTextSize(label, font, font_scale, thickness)[0]
     x, y = point
-    cv2.rectangle(image, (x, y - size[1]), (x + size[0], y), (0,255,255), cv2.FILLED)
+    cv2.rectangle(image, (x, y - size[1]), (x + size[0], y), color, cv2.FILLED)
     cv2.putText(image, label, point, font, font_scale, (0, 0, 0), thickness, lineType=cv2.LINE_AA)
-
-
-    
-# 顔検出(MTCNN)
-def face_detection(Img, image_size):
-    minsize = 20
-    threshold = [ 0.6, 0.7, 0.7 ]  
-    factor = 0.709 
-    margin = 44
-    gpu_memory_fraction = 1.0
-    
-    print('Creating networks and loading parameters')
-    with tf.Graph().as_default():
-        #gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_memory_fraction)
-        #sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
-        gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=gpu_memory_fraction)
-        sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
-        with sess.as_default():
-            pnet, rnet, onet = align.detect_face.create_mtcnn(sess, None)
-    
-            Img_size = np.asarray(Img.shape)[0:2]
-            bounding_boxes, _ = align.detect_face.detect_face(Img, minsize, pnet, rnet, onet, threshold, factor)
-            faces = np.zeros((len(bounding_boxes), image_size, image_size, 3), dtype = "uint8")
-            bb = np.zeros((len(bounding_boxes), 4), dtype=np.int32)
-            for i in range(len(bounding_boxes)):            
-                det = np.squeeze(bounding_boxes[i,0:4])
-                bb[i, 0] = np.maximum(det[0]-margin/2, 0)
-                bb[i, 1] = np.maximum(det[1]-margin/2, 0)
-                bb[i, 2] = np.minimum(det[2]+margin/2, Img_size[1])
-                bb[i, 3] = np.minimum(det[3]+margin/2, Img_size[0])
-                cropped = Img[bb[i, 1]:bb[i, 3],bb[i, 0]:bb[i, 2],:]
-                #aligned = misc.imresize(cropped, (image_size, image_size), interp='bilinear')
-                aligned = np.array(Image.fromarray(cropped).resize((image_size, image_size), resample=2))
-                faces[i, :, :, :] = cv2.cvtColor(aligned, cv2.COLOR_BGR2RGB)
-    return faces, bb
-
 
 # 性別・年齢予測
 def age_gender_predict(faces):    
     if len(faces) > 0:   
         # モデルの設定
         if os.isdir("model") == False:
-            pre_model = "https://github.com/yu4u/age-gender-estimation/releases/download/v0.5/weights.28-3.73.hdf5"
-            modhash = 'fbe63257a054c1c5466cfd7bf14646d6'
-            weight_file = get_file("weights.28-3.73.hdf5", pre_model, cache_subdir="model",
+            pre_model = "https://github.com/yu4u/age-gender-estimation/releases/download/v0.6/EfficientNetB3_224_weights.11-3.44.hdf5"
+            modhash = '6d7f7b7ced093a8b3ef6399163da6ece'
+            weight_file = get_file("EfficientNetB3_224_weights.11-3.44.hdf5", pre_model, cache_subdir="model",
                                    file_hash=modhash, cache_dir=str(Path(__file__).resolve().parent))
         else:
-            weight_file = "model/weights.28-3.73.hdf5"            
+            weight_file = "model/EfficientNetB3_224_weights.11-3.44.hdf5"            
 
-        img_size = np.asarray(faces.shape)[1]
-        model = WideResNet(img_size, depth=16, k=8)()
+        # load model and weights
+        model_name, img_size = Path(weight_file).stem.split("_")[:2]
+        img_size = int(img_size)
+        cfg = OmegaConf.from_dotlist([f"model.model_name={model_name}", f"model.img_size={img_size}"])
+        model = get_model(cfg)
         model.load_weights(weight_file)
         
         # 予測
         results = model.predict(faces)
-        Genders = results[0]
+        predicted_genders = results[0]
         ages = np.arange(0, 101).reshape(101, 1)
-        Ages = results[1].dot(ages).flatten()
+        predicted_ages = results[1].dot(ages).flatten()
 
-    return Ages, Genders
+    return predicted_ages, predicted_genders
 
 if __name__ == "__main__":
     #
     #   main 
     #        
     img = cv2.imread("test2.jpg") #入力画像
-    img_size = 64
+    #img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img_size = 224
+    img_h, img_w, _ = np.shape(img)
 
-    faces, bb = face_detection(img, img_size)    
-    Ages, Genders = age_gender_predict(faces)
+    # for face detection
+    detector = dlib.get_frontal_face_detector()
+    
+    # detect faces using dlib detector
+    detected = detector(img, 1)
+    faces = np.empty((len(detected), img_size, img_size, 3))
+    
+    predicted_ages, predicted_genders = age_gender_predict(faces)
 
-    for face in range(len(faces)):        
-        cv2.rectangle(img,(bb[face, 0], bb[face, 1]),(bb[face, 2], bb[face, 3]),(0,255,255),2)
-        label = "{}, {}".format(int(Ages[face]), "Male" if Genders[face][0] < 0.5 else "Female")
-        draw_label(img, (bb[face, 0], bb[face, 1]), label)
+    #for face in range(len(faces)):        
+    #    cv2.rectangle(img,(bb[face, 0], bb[face, 1]),(bb[face, 2], bb[face, 3]),(0,255,255),2)
+    #    label = "{}, {}".format(int(Ages[face]), "Male" if Genders[face][0] < 0.5 else "Female")
+    #    draw_label(img, (bb[face, 0], bb[face, 1]), label)
+    margin = 1
+    if len(detected) > 0:
+        for i, d in enumerate(detected):
+            x1, y1, x2, y2, w, h = d.left(), d.top(), d.right() + 1, d.bottom() + 1, d.width(), d.height()
+            xw1 = max(int(x1 - margin * w), 0)
+            yw1 = max(int(y1 - margin * h), 0)
+            xw2 = min(int(x2 + margin * w), img_w - 1)
+            yw2 = min(int(y2 + margin * h), img_h - 1)
+            if predicted_genders[i][0] < 0.5:
+                color = (255, 128, 128)
+                label = "{},{}".format(int(predicted_ages[i]), "Male")
+            else:
+                color = (128, 128, 255)
+                label = "{},{}".format(int(predicted_ages[i]), "Female")
+            cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+            # cv2.rectangle(img, (xw1, yw1), (xw2, yw2), (255, 0, 0), 2)
+            faces[i] = cv2.resize(img[yw1:yw2 + 1, xw1:xw2 + 1], (img_size, img_size))
+            draw_label(img, (d.left(), d.top()), label, color)
+            
+        # draw results
+        #for i, d in enumerate(detected):
+        #    label = "{},{}".format(int(predicted_ages[i]),
+        #                            "Male" if predicted_genders[i][0] < 0.5 else "Female")
+        #    draw_label(img, (d.left(), d.top()), label)
 
     # 出力画像の保存
     cv2.imwrite('static/images/output2.jpg', img)
