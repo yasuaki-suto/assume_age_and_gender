@@ -40,6 +40,7 @@ from tensorflow.keras import applications
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense
 import dlib
+import traceback
 
 def get_model(cfg):
     base_model = getattr(applications, cfg.model.model_name)(
@@ -93,49 +94,51 @@ if __name__ == "__main__":
     #
     #   main 
     #        
-    img = cv2.imread("test2.jpg") #入力画像
-    #img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img_size = 224
-    img_h, img_w, _ = np.shape(img)
+    try:
+        img = cv2.imread("test2.jpg") #入力画像
+        #img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_size = 224
+        img_h, img_w, _ = np.shape(img)
 
-    # for face detection
-    detector = dlib.get_frontal_face_detector()
-    
-    # detect faces using dlib detector
-    detected = detector(img, 1)
-    faces = np.empty((len(detected), img_size, img_size, 3))
-    
-    predicted_ages, predicted_genders = age_gender_predict(faces)
+        # for face detection
+        detector = dlib.get_frontal_face_detector()
+        
+        # detect faces using dlib detector
+        detected = detector(img, 1)
+        faces = np.empty((len(detected), img_size, img_size, 3))
+        
+        predicted_ages, predicted_genders = age_gender_predict(faces)
 
-    #for face in range(len(faces)):        
-    #    cv2.rectangle(img,(bb[face, 0], bb[face, 1]),(bb[face, 2], bb[face, 3]),(0,255,255),2)
-    #    label = "{}, {}".format(int(Ages[face]), "Male" if Genders[face][0] < 0.5 else "Female")
-    #    draw_label(img, (bb[face, 0], bb[face, 1]), label)
-    margin = 1
-    if len(detected) > 0:
-        for i, d in enumerate(detected):
-            x1, y1, x2, y2, w, h = d.left(), d.top(), d.right() + 1, d.bottom() + 1, d.width(), d.height()
-            xw1 = max(int(x1 - margin * w), 0)
-            yw1 = max(int(y1 - margin * h), 0)
-            xw2 = min(int(x2 + margin * w), img_w - 1)
-            yw2 = min(int(y2 + margin * h), img_h - 1)
-            if predicted_genders[i][0] < 0.5:
-                color = (255, 128, 128)
-                label = "{},{}".format(int(predicted_ages[i]), "Male")
-            else:
-                color = (128, 128, 255)
-                label = "{},{}".format(int(predicted_ages[i]), "Female")
-            cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
-            # cv2.rectangle(img, (xw1, yw1), (xw2, yw2), (255, 0, 0), 2)
-            faces[i] = cv2.resize(img[yw1:yw2 + 1, xw1:xw2 + 1], (img_size, img_size))
-            draw_label(img, (d.left(), d.top()), label, color)
-            
-        # draw results
-        #for i, d in enumerate(detected):
-        #    label = "{},{}".format(int(predicted_ages[i]),
-        #                            "Male" if predicted_genders[i][0] < 0.5 else "Female")
-        #    draw_label(img, (d.left(), d.top()), label)
+        #for face in range(len(faces)):        
+        #    cv2.rectangle(img,(bb[face, 0], bb[face, 1]),(bb[face, 2], bb[face, 3]),(0,255,255),2)
+        #    label = "{}, {}".format(int(Ages[face]), "Male" if Genders[face][0] < 0.5 else "Female")
+        #    draw_label(img, (bb[face, 0], bb[face, 1]), label)
+        margin = 1
+        if len(detected) > 0:
+            for i, d in enumerate(detected):
+                x1, y1, x2, y2, w, h = d.left(), d.top(), d.right() + 1, d.bottom() + 1, d.width(), d.height()
+                xw1 = max(int(x1 - margin * w), 0)
+                yw1 = max(int(y1 - margin * h), 0)
+                xw2 = min(int(x2 + margin * w), img_w - 1)
+                yw2 = min(int(y2 + margin * h), img_h - 1)
+                if predicted_genders[i][0] < 0.5:
+                    color = (255, 128, 128)
+                    label = "{},{}".format(int(predicted_ages[i]), "Male")
+                else:
+                    color = (128, 128, 255)
+                    label = "{},{}".format(int(predicted_ages[i]), "Female")
+                cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+                # cv2.rectangle(img, (xw1, yw1), (xw2, yw2), (255, 0, 0), 2)
+                faces[i] = cv2.resize(img[yw1:yw2 + 1, xw1:xw2 + 1], (img_size, img_size))
+                draw_label(img, (d.left(), d.top()), label, color)
+                
+            # draw results
+            #for i, d in enumerate(detected):
+            #    label = "{},{}".format(int(predicted_ages[i]),
+            #                            "Male" if predicted_genders[i][0] < 0.5 else "Female")
+            #    draw_label(img, (d.left(), d.top()), label)
 
-    # 出力画像の保存
-    cv2.imwrite('static/images/output2.jpg', img)
-
+        # 出力画像の保存
+        cv2.imwrite('static/images/output2.jpg', img)
+    except:
+        print(traceback.print_exc())
