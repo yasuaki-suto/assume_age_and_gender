@@ -113,6 +113,7 @@ def handle_image(event):
             yw1 = max(int(y1 - margin * h), 0)
             xw2 = min(int(x2 + margin * w), img_w - 1)
             yw2 = min(int(y2 + margin * h), img_h - 1)
+            print(predicted_ages[i])
             if predicted_genders[i][0] < 0.5:
                 color = (255, 128, 128)
                 label = "{},{}".format(int(predicted_ages[i]), "Male")
