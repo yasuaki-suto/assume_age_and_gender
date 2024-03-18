@@ -22,6 +22,7 @@ from linebot.models import (
 )
 
 from face_age_gender import age_gender_predict
+import numpy as np
 import dlib
 
 
