@@ -13,4 +13,4 @@ six==1.16.0
 tensorflow==2.16.1
 gunicorn==21.2.0
 omegaconf==2.3.0
-dlib==19.24.2
+dlib-bin
