@@ -118,7 +118,7 @@ def handle_image(event):
                 faces[i] = cv2.resize(img[yw1:yw2 + 1, xw1:xw2 + 1], (img_size, img_size))
                 
             predicted_ages, predicted_genders = get_predict(model, faces)
-            add_label(img, detected, predicted_ages)
+            add_label(img, detected, predicted_genders, predicted_ages)
 
         # 出力画像の保存
         cv2.imwrite('static/images/output.jpg', img)

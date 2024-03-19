@@ -92,7 +92,7 @@ def get_predict(model, faces):
 
     return predicted_ages, predicted_genders
 
-def add_label(img, detected, predicted_ages):
+def add_label(img, detected, predicted_genders, predicted_ages):
     for i, d in enumerate(detected):
         if predicted_genders[i][0] < 0.5:
             color = (255, 128, 128)
@@ -139,7 +139,7 @@ if __name__ == "__main__":
                 faces[i] = cv2.resize(img[yw1:yw2 + 1, xw1:xw2 + 1], (img_size, img_size))
                 
             predicted_ages, predicted_genders = get_predict(model, faces)
-            add_label(img, detected, predicted_ages)
+            add_label(img, detected, predicted_genders, predicted_ages)
 
         # 出力画像の保存
         cv2.imwrite('static/images/output2.jpg', img)
