@@ -21,7 +21,7 @@ from linebot.models import (
     ImageMessage, ImageSendMessage, AudioMessage
 )
 
-from face_age_gender import age_gender_predict
+from face_age_gender import get_loaded_model, get_predict, add_label
 import numpy as np
 import dlib
 
@@ -83,51 +83,48 @@ def handle_message(event):
 
 @handler.add(MessageEvent, message=ImageMessage)
 def handle_image(event):
+    try:
+        message_id = event.message.id
+        src_img_path = SRC_IMG_PATH.format(message_id)   # 保存する画像のパス
+        save_img(message_id, src_img_path)   # 画像を一時保存する
+        
+        img = cv2.imread(src_img_path)
+        img_size = 224
+        img_h, img_w, _ = np.shape(img)
+        
+        # for face detection
+        detector = dlib.get_frontal_face_detector()
+        
+        # detect faces using dlib detector
+        detected = detector(img, 1)
+        faces = np.empty((len(detected), img_size, img_size, 3))
+        
+        model = get_loaded_model()
+        
+        #for face in range(len(faces)):        
+        #    cv2.rectangle(img,(bb[face, 0], bb[face, 1]),(bb[face, 2], bb[face, 3]),(0,255,255),2)
+        #    label = "{}, {}".format(int(Ages[face]), "Male" if Genders[face][0] < 0.5 else "Female")
+        #    draw_label(img, (bb[face, 0], bb[face, 1]), label)
+        margin = 1
+        if len(detected) > 0:
+            for i, d in enumerate(detected):
+                x1, y1, x2, y2, w, h = d.left(), d.top(), d.right() + 1, d.bottom() + 1, d.width(), d.height()
+                xw1 = max(int(x1 - margin * w), 0)
+                yw1 = max(int(y1 - margin * h), 0)
+                xw2 = min(int(x2 + margin * w), img_w - 1)
+                yw2 = min(int(y2 + margin * h), img_h - 1)
+                cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                # cv2.rectangle(img, (xw1, yw1), (xw2, yw2), (255, 0, 0), 2)
+                faces[i] = cv2.resize(img[yw1:yw2 + 1, xw1:xw2 + 1], (img_size, img_size))
+                
+            predicted_ages, predicted_genders = get_predict(faces)
+            add_label(img, detected, predicted_ages)
 
-    message_id = event.message.id
-    src_img_path = SRC_IMG_PATH.format(message_id)   # 保存する画像のパス
-    save_img(message_id, src_img_path)   # 画像を一時保存する
+        # 出力画像の保存
+        cv2.imwrite('static/images/output.jpg', img)
     
-    img = cv2.imread(src_img_path)
-    img_size = 224
-    img_h, img_w, _ = np.shape(img)
-
-    # for face detection
-    detector = dlib.get_frontal_face_detector()
-    
-    # detect faces using dlib detector
-    detected = detector(img, 1)
-    faces = np.empty((len(detected), img_size, img_size, 3))
-    
-    predicted_ages, predicted_genders = age_gender_predict(faces)
-
-    #for face in range(len(faces)):        
-    #    cv2.rectangle(img,(bb[face, 0], bb[face, 1]),(bb[face, 2], bb[face, 3]),(0,255,255),2)
-    #    label = "{}, {}".format(int(Ages[face]), "Male" if Genders[face][0] < 0.5 else "Female")
-    #    draw_label(img, (bb[face, 0], bb[face, 1]), label)
-    margin = 1
-    if len(detected) > 0:
-        for i, d in enumerate(detected):
-            x1, y1, x2, y2, w, h = d.left(), d.top(), d.right() + 1, d.bottom() + 1, d.width(), d.height()
-            xw1 = max(int(x1 - margin * w), 0)
-            yw1 = max(int(y1 - margin * h), 0)
-            xw2 = min(int(x2 + margin * w), img_w - 1)
-            yw2 = min(int(y2 + margin * h), img_h - 1)
-            print(predicted_ages[i])
-            if predicted_genders[i][0] < 0.5:
-                color = (255, 128, 128)
-                label = "{},{}".format(int(predicted_ages[i]), "Male")
-            else:
-                color = (128, 128, 255)
-                label = "{},{}".format(int(predicted_ages[i]), "Female")
-            cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
-            # cv2.rectangle(img, (xw1, yw1), (xw2, yw2), (255, 0, 0), 2)
-            faces[i] = cv2.resize(img[yw1:yw2 + 1, xw1:xw2 + 1], (img_size, img_size))
-            draw_label(img, (d.left(), d.top()), label, color)
-
-    # 出力画像の保存
-    cv2.imwrite('static/images/output.jpg', img)
-    
+    except:
+        print(traceback.format_exc())
     '''
     try:
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=all_text))
