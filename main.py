@@ -117,7 +117,7 @@ def handle_image(event):
                 # cv2.rectangle(img, (xw1, yw1), (xw2, yw2), (255, 0, 0), 2)
                 faces[i] = cv2.resize(img[yw1:yw2 + 1, xw1:xw2 + 1], (img_size, img_size))
                 
-            predicted_ages, predicted_genders = get_predict(faces)
+            predicted_ages, predicted_genders = get_predict(model, faces)
             add_label(img, detected, predicted_ages)
 
         # 出力画像の保存
