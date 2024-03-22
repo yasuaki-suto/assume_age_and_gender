@@ -3,6 +3,8 @@ from PIL import Image
 from pathlib import Path
 
 import os
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+import sys
 
 import traceback
 
@@ -31,6 +33,7 @@ import dlib
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('ENV_LINE_CHANNEL_ACCESS_TOKEN')
 LINE_CHANNEL_SECRET       = os.getenv('ENV_LINE_CHANNEL_SECRET')
 RENDER_URL = "https://assume-age-and-gender.onrender.com"
+#RENDER_URL = "http://localhost:8080/"
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
@@ -83,6 +86,7 @@ def handle_message(event):
 
 @handler.add(MessageEvent, message=ImageMessage)
 def handle_image(event):
+    '''
     try:
         message_id = event.message.id
         src_img_path = SRC_IMG_PATH.format(message_id)   # 保存する画像のパス
@@ -125,6 +129,99 @@ def handle_image(event):
     
     except:
         print(traceback.format_exc())
+    #message_id = event.message.id
+    #image_path = getImageLine(message_id)
+    
+    line_bot_api.reply_message(
+        event.reply_token,[
+        ImageSendMessage(
+            original_content_url = RENDER_URL + "static/images/output.jpg",
+            preview_image_url = RENDER_URL + "static/images/output.jpg"
+        ),
+        ]
+    )
+    
+    # 一時保存していた画像を削除
+    Path(SRC_IMG_PATH.format(message_id)).absolute().unlink()
+    '''
+    message_id = event.message.id
+    src_img_path = SRC_IMG_PATH.format(message_id)   # 保存する画像のパス
+    save_img(message_id, src_img_path)   # 画像を一時保存する
+    input_file = src_img_path
+    
+    content = line_bot_api.get_message_content(event.message.id)
+    content_b = b""
+    for c in content.iter_content():
+        content_b = content_b + c
+        
+    '''
+    #input_file = "C:\\Users\\sutou\\Downloads\\20240223-000517.jpg"
+    input_file = "C:\\Users\\sutou\\Downloads\\101774.jpg" #手動撮影未加工
+    #input_file = "C:\\Users\\sutou\\Downloads\\29399.jpg"
+    #input_file = "C:\\Users\\sutou\\Downloads\\DSC_0083~2.JPG" #手動撮影画像切り抜き
+
+    '''
+    img = cv2.imread(input_file)
+
+    #with io.open(input_file, 'rb') as image_file:
+    #    content = image_file.read()
+    credentials = service_account.Credentials.from_service_account_file('helical-mile-415213-e08c46a18701.json')
+    client = vision.ImageAnnotatorClient(credentials=credentials)
+
+    image = vision.Image(content=content_b)
+    response = client.text_detection(image=image)
+
+    bounds = get_document_bounds(response, FeatureType.BLOCK)
+    img_block = draw_boxes(input_file, bounds)
+
+    bounds = get_document_bounds(response, FeatureType.PARA)
+    img_para = draw_boxes(input_file, bounds)
+
+    bounds = get_document_bounds(response, FeatureType.WORD)
+    img_word = draw_boxes(input_file, bounds)
+
+    bounds = get_document_bounds(response, FeatureType.SYMBOL)
+    img_symbol = draw_boxes(input_file, bounds)
+
+    plt.figure(figsize=[20,20])
+    plt.subplot(141);plt.imshow(img_block[:,:,::-1]);plt.title("img_block")
+    plt.subplot(142);plt.imshow(img_para[:,:,::-1]);plt.title("img_para")
+    plt.subplot(143);plt.imshow(img_word[:,:,::-1]);plt.title("img_word")
+    plt.subplot(144);plt.imshow(img_symbol[:,:,::-1]);plt.title("img_symbol")
+    plt.savefig("static/images/img1.png", format='png')
+
+    lines = get_sorted_lines(response)
+    all_text=''
+    for line in lines:
+      texts = [i[2] for i in line]  # i[0]:x座標 i[1]:y座標 i[2]:文字 i[3]:vertices(=左上、右上、左下、右下のxy座標を持つ辞書)
+      texts = ''.join(texts)
+      bounds = [i[3] for i in line]
+      #print(texts)
+      all_text = all_text+texts + '\n'
+      for bound in bounds:
+        p1 = (bounds[0].vertices[0].x, bounds[0].vertices[0].y)   # top left
+        p2 = (bounds[-1].vertices[1].x, bounds[-1].vertices[1].y) # top right
+        p3 = (bounds[-1].vertices[2].x, bounds[-1].vertices[2].y) # bottom right
+        p4 = (bounds[0].vertices[3].x, bounds[0].vertices[3].y)   # bottom left
+        cv2.line(img, p1, p2, (0, 255, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.line(img, p2, p3, (0, 255, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.line(img, p3, p4, (0, 255, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.line(img, p4, p1, (0, 255, 0), thickness=1, lineType=cv2.LINE_AA)
+
+    plt.figure(figsize=[10,10])
+    plt.axis('off')
+    plt.imshow(img[:,:,::-1]);plt.title("img_by_line")
+    #buf = io.BytesIO()
+    #plt.savefig(buf, format='png')
+    #plt.show()
+    #グラフ表示しない
+    #plt.close()
+    #tmpfile = buf.getvalue()
+    #png = base64.encodebytes(buf.getvalue()).decode("utf-8")
+    plt.savefig("static/images/img2.png", format='png')
+    
+    print(all_text)
+    #print(png)
     '''
     try:
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=all_text))
@@ -144,9 +241,14 @@ def handle_image(event):
     line_bot_api.reply_message(
         event.reply_token,[
         ImageSendMessage(
-            original_content_url = RENDER_URL + "static/images/output.jpg",
-            preview_image_url = RENDER_URL + "static/images/output.jpg"
+            original_content_url = RENDER_URL + "static/images/img1.png",
+            preview_image_url = RENDER_URL + "static/images/img1.png"
         ),
+        ImageSendMessage(
+            original_content_url = RENDER_URL + "static/images/img2.png",
+            preview_image_url = RENDER_URL + "static/images/img2.png"
+        ),
+        TextSendMessage(text=all_text)
         ]
     )
     
