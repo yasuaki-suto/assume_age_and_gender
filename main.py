@@ -32,8 +32,8 @@ import dlib
 #LINE Developers->チャネル名->MessagingAPI設定
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('ENV_LINE_CHANNEL_ACCESS_TOKEN')
 LINE_CHANNEL_SECRET       = os.getenv('ENV_LINE_CHANNEL_SECRET')
-#RENDER_URL = "https://assume-age-and-gender.onrender.com"
-RENDER_URL = "http://localhost:8080/"
+RENDER_URL = "https://assume-age-and-gender.onrender.com/"
+#RENDER_URL = "http://localhost:8080/"
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
